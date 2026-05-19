@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -110,8 +110,9 @@ function ItemDialog<T extends Record<string, any>>({
   onSave: (v: T) => void;
 }) {
   const [draft, setDraft] = useState<T>(value);
-  // reset draft when opens
-  useMemo(() => setDraft(value), [value, open]);
+  useEffect(() => {
+    if (open) setDraft(value);
+  }, [value, open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
