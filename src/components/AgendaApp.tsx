@@ -443,6 +443,147 @@ function Section<T extends BaseItem>({
   );
 }
 
+type Task = { id: string; title: string; done?: boolean; date?: string };
+
+function TasksPanel({ storageKey, label }: { storageKey: string; label: string }) {
+  const [tasks, setTasks] = useLocalStorage<Task[]>(storageKey, []);
+  const [draft, setDraft] = useState("");
+  const [draftDate, setDraftDate] = useState("");
+
+  const add = () => {
+    const t = draft.trim();
+    if (!t) {
+      toast.error("Escreva uma tarefa");
+      return;
+    }
+    setTasks([...tasks, { id: uid(), title: t, date: draftDate || undefined, done: false }]);
+    setDraft("");
+    setDraftDate("");
+    toast.success("Tarefa adicionada");
+  };
+
+  const sorted = [...tasks].sort((a, b) => {
+    if (!!a.done !== !!b.done) return a.done ? 1 : -1;
+    return (a.date || "9999").localeCompare(b.date || "9999");
+  });
+
+  const pending = tasks.filter((t) => !t.done).length;
+
+  return (
+    <Card className="border-pink-100">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between text-base">
+          <span className="flex items-center gap-2">
+            <ClipboardList className="h-5 w-5 text-pink-600" /> Tarefas — {label}
+          </span>
+          <Badge variant="secondary" className="bg-pink-100 text-pink-800">
+            {pending} pendente{pending === 1 ? "" : "s"}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Input
+            placeholder="Nova tarefa…"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") add();
+            }}
+            className="flex-1"
+          />
+          <Input
+            type="date"
+            value={draftDate}
+            onChange={(e) => setDraftDate(e.target.value)}
+            className="sm:w-44"
+          />
+          <Button onClick={add} className="bg-pink-600 hover:bg-pink-700">
+            <Plus className="h-4 w-4" /> Adicionar
+          </Button>
+        </div>
+
+        {sorted.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-pink-200 bg-pink-50/40 py-8 text-center text-sm text-muted-foreground">
+            Nenhuma tarefa por aqui ainda.
+          </div>
+        ) : (
+          <ul className="grid gap-1.5">
+            {sorted.map((t) => (
+              <li
+                key={t.id}
+                className={`flex items-center gap-3 rounded-lg border bg-card p-2.5 transition ${
+                  t.done ? "border-pink-100 opacity-60" : "border-border hover:border-pink-200"
+                }`}
+              >
+                <Checkbox
+                  checked={!!t.done}
+                  onCheckedChange={(v) =>
+                    setTasks(tasks.map((x) => (x.id === t.id ? { ...x, done: !!v } : x)))
+                  }
+                />
+                <div className="min-w-0 flex-1">
+                  <div className={`text-sm font-medium ${t.done ? "line-through" : ""}`}>
+                    {t.title}
+                  </div>
+                  {t.date && (
+                    <div className="text-xs text-muted-foreground">{formatDate(t.date)}</div>
+                  )}
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    setTasks(tasks.filter((x) => x.id !== t.id));
+                    toast.success("Tarefa removida");
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AreaTabs({
+  storageKey,
+  label,
+  children,
+}: {
+  storageKey: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tabs defaultValue="itens" className="w-full">
+      <TabsList className="bg-pink-100/60">
+        <TabsTrigger
+          value="itens"
+          className="data-[state=active]:bg-pink-600 data-[state=active]:text-white"
+        >
+          Itens
+        </TabsTrigger>
+        <TabsTrigger
+          value="tarefas"
+          className="data-[state=active]:bg-pink-600 data-[state=active]:text-white"
+        >
+          Tarefas
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="itens" className="mt-3">
+        {children}
+      </TabsContent>
+      <TabsContent value="tarefas" className="mt-3">
+        <TasksPanel storageKey={storageKey} label={label} />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
 const titleField: FieldDef = {
   key: "title",
   label: "Título",
@@ -761,6 +902,7 @@ export default function AgendaApp() {
 
           {/* ============= CLÍNICA ============= */}
           <TabsContent value="clinica" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.clinica" label="Clínica">
             <Section<Clinica>
               title="Dias de Clínica"
               description="Agende seus atendimentos, pacientes e procedimentos."
@@ -785,10 +927,12 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
 
           {/* ============= LABORATÓRIOS ============= */}
           <TabsContent value="laboratorios" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.laboratorios" label="Laboratórios">
             <Section<Laboratorio>
               title="Laboratórios"
               description="Práticas e aulas de laboratório."
@@ -813,9 +957,11 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
 
           <TabsContent value="materias" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.materias" label="Matérias">
             <Section<Materia>
               title="Matérias"
               description="Disciplinas do semestre, professores e horários."
@@ -836,9 +982,11 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
 
           <TabsContent value="estagio" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.estagio" label="Estágio">
             <Section<Estagio>
               title="Estágio"
               description="Plantões, supervisores e locais de estágio."
@@ -861,9 +1009,11 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
 
           <TabsContent value="provas" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.provas" label="Provas">
             <Section<Prova>
               title="Provas"
               description="Datas de avaliações e conteúdos cobrados."
@@ -888,9 +1038,11 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
 
           <TabsContent value="tbl" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.tbl" label="TBL">
             <Section<Tbl>
               title="TBL"
               description="Team-Based Learning: temas e datas."
@@ -913,9 +1065,11 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
 
           <TabsContent value="trabalhos" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.trabalhos" label="Trabalhos">
             <Section<Trabalho>
               title="Trabalhos"
               description="Atividades, seminários e entregas."
@@ -938,9 +1092,11 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
 
           <TabsContent value="materiais" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.materiais" label="Materiais">
             <Section<Material>
               title="Lista de Materiais"
               description="O que comprar e levar — vincule a dias de clínica e laboratório."
@@ -1006,9 +1162,11 @@ export default function AgendaApp() {
                 );
               }}
             />
+          </AreaTabs>
           </TabsContent>
 
           <TabsContent value="ic" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.ic" label="IC">
             <Card className="mb-4 border-pink-200 bg-gradient-to-r from-pink-100 to-rose-50">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-pink-800">
@@ -1055,9 +1213,11 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
 
           <TabsContent value="pessoal" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.pessoal" label="Pessoal">
             <Section<Pessoal>
               title="Pessoal"
               description="Compromissos e tarefas da vida pessoal: saúde, lazer, consultas e afazeres."
@@ -1085,6 +1245,7 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
         </Tabs>
 
