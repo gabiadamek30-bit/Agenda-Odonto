@@ -466,6 +466,7 @@ export default function AgendaApp() {
   );
   const [materiais, setMateriais] = useLocalStorage<Material[]>(STORAGE_KEYS.materiais, []);
   const [ic, setIc] = useLocalStorage<IcItem[]>(STORAGE_KEYS.ic, []);
+  const [pessoal, setPessoal] = useLocalStorage<Pessoal[]>(STORAGE_KEYS.pessoal, []);
   const [tab, setTab] = useState("inicio");
 
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
