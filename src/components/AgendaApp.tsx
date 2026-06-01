@@ -40,6 +40,7 @@ import {
   Home,
   Bell,
   BellRing,
+  Heart,
 } from "lucide-react";
 import { useLocalStorage, uid } from "@/lib/storage";
 
@@ -69,6 +70,7 @@ type Material = BaseItem & {
   laboratorioIds?: string[];
 };
 type IcItem = BaseItem & { tipo?: string; orientador?: string };
+type Pessoal = BaseItem & { categoria?: string; local?: string };
 
 const STORAGE_KEYS = {
   clinica: "agenda.clinica",
@@ -80,6 +82,7 @@ const STORAGE_KEYS = {
   laboratorios: "agenda.laboratorios",
   materiais: "agenda.materiais",
   ic: "agenda.ic",
+  pessoal: "agenda.pessoal",
   notified: "agenda.notified",
 };
 
@@ -463,6 +466,7 @@ export default function AgendaApp() {
   );
   const [materiais, setMateriais] = useLocalStorage<Material[]>(STORAGE_KEYS.materiais, []);
   const [ic, setIc] = useLocalStorage<IcItem[]>(STORAGE_KEYS.ic, []);
+  const [pessoal, setPessoal] = useLocalStorage<Pessoal[]>(STORAGE_KEYS.pessoal, []);
   const [tab, setTab] = useState("inicio");
 
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
@@ -480,8 +484,9 @@ export default function AgendaApp() {
       ...trabalhos.map((i) => ({ kind: "Trabalho", tab: "trabalhos", item: i as BaseItem })),
       ...laboratorios.map((i) => ({ kind: "Laboratório", tab: "laboratorios", item: i as BaseItem })),
       ...ic.map((i) => ({ kind: "IC", tab: "ic", item: i as BaseItem })),
+      ...pessoal.map((i) => ({ kind: "Pessoal", tab: "pessoal", item: i as BaseItem })),
     ],
-    [clinica, estagio, provas, tbl, trabalhos, laboratorios, ic],
+    [clinica, estagio, provas, tbl, trabalhos, laboratorios, ic, pessoal],
   );
 
   const upcoming = useMemo(() => {
@@ -590,6 +595,7 @@ export default function AgendaApp() {
     laboratorios: laboratorios.length,
     materiais: materiais.filter((m) => !m.comprado).length,
     ic: ic.length,
+    pessoal: pessoal.length,
   };
 
   const quickTabs: Array<{
@@ -607,6 +613,7 @@ export default function AgendaApp() {
     { key: "trabalhos", label: "Trabalhos", icon: ClipboardList, count: counts.trabalhos },
     { key: "materiais", label: "Materiais", icon: Package, count: counts.materiais },
     { key: "ic", label: "IC", icon: Microscope, count: counts.ic },
+    { key: "pessoal", label: "Pessoal", icon: Heart, count: counts.pessoal },
   ];
 
   return (
@@ -655,6 +662,7 @@ export default function AgendaApp() {
             <TabsTrigger value="ic" className="data-[state=active]:bg-pink-600 data-[state=active]:text-white">
               <Microscope className="mr-1 h-4 w-4" />IC
             </TabsTrigger>
+            <TabsTrigger value="pessoal"><Heart className="mr-1 h-4 w-4" />Pessoal</TabsTrigger>
           </TabsList>
 
           {/* ============= INÍCIO ============= */}
@@ -1044,6 +1052,36 @@ export default function AgendaApp() {
                 <>
                   {i.tipo && <Badge variant="outline" className="mr-1">{i.tipo}</Badge>}
                   {i.orientador && <span>Orient. {i.orientador}</span>}
+                </>
+              )}
+            />
+          </TabsContent>
+
+          <TabsContent value="pessoal" className="mt-4">
+            <Section<Pessoal>
+              title="Pessoal"
+              description="Compromissos e tarefas da vida pessoal: saúde, lazer, consultas e afazeres."
+              icon={Heart}
+              items={pessoal}
+              setItems={setPessoal}
+              fields={[
+                { ...titleField, placeholder: "Ex.: Consulta dermatologista" },
+                dateField,
+                timeField,
+                reminderField,
+                {
+                  key: "categoria",
+                  label: "Categoria",
+                  type: "select",
+                  options: ["Saúde", "Bem-estar", "Lazer", "Social", "Tarefas", "Outros"],
+                },
+                { key: "local", label: "Local", placeholder: "Endereço ou estabelecimento" },
+                notesField,
+              ]}
+              renderMeta={(i) => (
+                <>
+                  {i.categoria && <Badge variant="outline" className="mr-1">{i.categoria}</Badge>}
+                  {i.local && <span>{i.local}</span>}
                 </>
               )}
             />
