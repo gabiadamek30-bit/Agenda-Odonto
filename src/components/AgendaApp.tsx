@@ -484,8 +484,9 @@ export default function AgendaApp() {
       ...trabalhos.map((i) => ({ kind: "Trabalho", tab: "trabalhos", item: i as BaseItem })),
       ...laboratorios.map((i) => ({ kind: "Laboratório", tab: "laboratorios", item: i as BaseItem })),
       ...ic.map((i) => ({ kind: "IC", tab: "ic", item: i as BaseItem })),
+      ...pessoal.map((i) => ({ kind: "Pessoal", tab: "pessoal", item: i as BaseItem })),
     ],
-    [clinica, estagio, provas, tbl, trabalhos, laboratorios, ic],
+    [clinica, estagio, provas, tbl, trabalhos, laboratorios, ic, pessoal],
   );
 
   const upcoming = useMemo(() => {
