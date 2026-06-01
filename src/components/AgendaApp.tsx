@@ -40,6 +40,7 @@ import {
   Home,
   Bell,
   BellRing,
+  Heart,
 } from "lucide-react";
 import { useLocalStorage, uid } from "@/lib/storage";
 
