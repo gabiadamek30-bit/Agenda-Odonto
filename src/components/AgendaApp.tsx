@@ -70,6 +70,7 @@ type Material = BaseItem & {
   laboratorioIds?: string[];
 };
 type IcItem = BaseItem & { tipo?: string; orientador?: string };
+type Pessoal = BaseItem & { categoria?: string; local?: string };
 
 const STORAGE_KEYS = {
   clinica: "agenda.clinica",
@@ -81,6 +82,7 @@ const STORAGE_KEYS = {
   laboratorios: "agenda.laboratorios",
   materiais: "agenda.materiais",
   ic: "agenda.ic",
+  pessoal: "agenda.pessoal",
   notified: "agenda.notified",
 };
 
