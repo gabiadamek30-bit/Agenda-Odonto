@@ -662,6 +662,7 @@ export default function AgendaApp() {
             <TabsTrigger value="ic" className="data-[state=active]:bg-pink-600 data-[state=active]:text-white">
               <Microscope className="mr-1 h-4 w-4" />IC
             </TabsTrigger>
+            <TabsTrigger value="pessoal"><Heart className="mr-1 h-4 w-4" />Pessoal</TabsTrigger>
           </TabsList>
 
           {/* ============= INÍCIO ============= */}
