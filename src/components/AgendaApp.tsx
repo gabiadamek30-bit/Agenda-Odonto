@@ -613,6 +613,7 @@ export default function AgendaApp() {
     { key: "trabalhos", label: "Trabalhos", icon: ClipboardList, count: counts.trabalhos },
     { key: "materiais", label: "Materiais", icon: Package, count: counts.materiais },
     { key: "ic", label: "IC", icon: Microscope, count: counts.ic },
+    { key: "pessoal", label: "Pessoal", icon: Heart, count: counts.pessoal },
   ];
 
   return (
