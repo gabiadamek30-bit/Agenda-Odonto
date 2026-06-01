@@ -1056,6 +1056,36 @@ export default function AgendaApp() {
               )}
             />
           </TabsContent>
+
+          <TabsContent value="pessoal" className="mt-4">
+            <Section<Pessoal>
+              title="Pessoal"
+              description="Compromissos e tarefas da vida pessoal: saúde, lazer, consultas e afazeres."
+              icon={Heart}
+              items={pessoal}
+              setItems={setPessoal}
+              fields={[
+                { ...titleField, placeholder: "Ex.: Consulta dermatologista" },
+                dateField,
+                timeField,
+                reminderField,
+                {
+                  key: "categoria",
+                  label: "Categoria",
+                  type: "select",
+                  options: ["Saúde", "Bem-estar", "Lazer", "Social", "Tarefas", "Outros"],
+                },
+                { key: "local", label: "Local", placeholder: "Endereço ou estabelecimento" },
+                notesField,
+              ]}
+              renderMeta={(i) => (
+                <>
+                  {i.categoria && <Badge variant="outline" className="mr-1">{i.categoria}</Badge>}
+                  {i.local && <span>{i.local}</span>}
+                </>
+              )}
+            />
+          </TabsContent>
         </Tabs>
 
         <p className="mt-8 text-center text-xs text-muted-foreground">
