@@ -595,6 +595,7 @@ export default function AgendaApp() {
     laboratorios: laboratorios.length,
     materiais: materiais.filter((m) => !m.comprado).length,
     ic: ic.length,
+    pessoal: pessoal.length,
   };
 
   const quickTabs: Array<{
