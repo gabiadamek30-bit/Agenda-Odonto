@@ -902,6 +902,7 @@ export default function AgendaApp() {
 
           {/* ============= CLÍNICA ============= */}
           <TabsContent value="clinica" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.clinica" label="Clínica">
             <Section<Clinica>
               title="Dias de Clínica"
               description="Agende seus atendimentos, pacientes e procedimentos."
@@ -926,10 +927,12 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
 
           {/* ============= LABORATÓRIOS ============= */}
           <TabsContent value="laboratorios" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.laboratorios" label="Laboratórios">
             <Section<Laboratorio>
               title="Laboratórios"
               description="Práticas e aulas de laboratório."
@@ -954,9 +957,11 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
 
           <TabsContent value="materias" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.materias" label="Matérias">
             <Section<Materia>
               title="Matérias"
               description="Disciplinas do semestre, professores e horários."
@@ -977,9 +982,11 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
 
           <TabsContent value="estagio" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.estagio" label="Estágio">
             <Section<Estagio>
               title="Estágio"
               description="Plantões, supervisores e locais de estágio."
@@ -1002,9 +1009,11 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
 
           <TabsContent value="provas" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.provas" label="Provas">
             <Section<Prova>
               title="Provas"
               description="Datas de avaliações e conteúdos cobrados."
@@ -1029,9 +1038,11 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
 
           <TabsContent value="tbl" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.tbl" label="TBL">
             <Section<Tbl>
               title="TBL"
               description="Team-Based Learning: temas e datas."
@@ -1054,9 +1065,11 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
 
           <TabsContent value="trabalhos" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.trabalhos" label="Trabalhos">
             <Section<Trabalho>
               title="Trabalhos"
               description="Atividades, seminários e entregas."
@@ -1079,9 +1092,11 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
 
           <TabsContent value="materiais" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.materiais" label="Materiais">
             <Section<Material>
               title="Lista de Materiais"
               description="O que comprar e levar — vincule a dias de clínica e laboratório."
@@ -1147,9 +1162,11 @@ export default function AgendaApp() {
                 );
               }}
             />
+          </AreaTabs>
           </TabsContent>
 
           <TabsContent value="ic" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.ic" label="IC">
             <Card className="mb-4 border-pink-200 bg-gradient-to-r from-pink-100 to-rose-50">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-pink-800">
@@ -1196,9 +1213,11 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
 
           <TabsContent value="pessoal" className="mt-4">
+            <AreaTabs storageKey="agenda.tasks.pessoal" label="Pessoal">
             <Section<Pessoal>
               title="Pessoal"
               description="Compromissos e tarefas da vida pessoal: saúde, lazer, consultas e afazeres."
@@ -1226,6 +1245,7 @@ export default function AgendaApp() {
                 </>
               )}
             />
+          </AreaTabs>
           </TabsContent>
         </Tabs>
 
