@@ -443,6 +443,147 @@ function Section<T extends BaseItem>({
   );
 }
 
+type Task = { id: string; title: string; done?: boolean; date?: string };
+
+function TasksPanel({ storageKey, label }: { storageKey: string; label: string }) {
+  const [tasks, setTasks] = useLocalStorage<Task[]>(storageKey, []);
+  const [draft, setDraft] = useState("");
+  const [draftDate, setDraftDate] = useState("");
+
+  const add = () => {
+    const t = draft.trim();
+    if (!t) {
+      toast.error("Escreva uma tarefa");
+      return;
+    }
+    setTasks([...tasks, { id: uid(), title: t, date: draftDate || undefined, done: false }]);
+    setDraft("");
+    setDraftDate("");
+    toast.success("Tarefa adicionada");
+  };
+
+  const sorted = [...tasks].sort((a, b) => {
+    if (!!a.done !== !!b.done) return a.done ? 1 : -1;
+    return (a.date || "9999").localeCompare(b.date || "9999");
+  });
+
+  const pending = tasks.filter((t) => !t.done).length;
+
+  return (
+    <Card className="border-pink-100">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between text-base">
+          <span className="flex items-center gap-2">
+            <ClipboardList className="h-5 w-5 text-pink-600" /> Tarefas — {label}
+          </span>
+          <Badge variant="secondary" className="bg-pink-100 text-pink-800">
+            {pending} pendente{pending === 1 ? "" : "s"}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Input
+            placeholder="Nova tarefa…"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") add();
+            }}
+            className="flex-1"
+          />
+          <Input
+            type="date"
+            value={draftDate}
+            onChange={(e) => setDraftDate(e.target.value)}
+            className="sm:w-44"
+          />
+          <Button onClick={add} className="bg-pink-600 hover:bg-pink-700">
+            <Plus className="h-4 w-4" /> Adicionar
+          </Button>
+        </div>
+
+        {sorted.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-pink-200 bg-pink-50/40 py-8 text-center text-sm text-muted-foreground">
+            Nenhuma tarefa por aqui ainda.
+          </div>
+        ) : (
+          <ul className="grid gap-1.5">
+            {sorted.map((t) => (
+              <li
+                key={t.id}
+                className={`flex items-center gap-3 rounded-lg border bg-card p-2.5 transition ${
+                  t.done ? "border-pink-100 opacity-60" : "border-border hover:border-pink-200"
+                }`}
+              >
+                <Checkbox
+                  checked={!!t.done}
+                  onCheckedChange={(v) =>
+                    setTasks(tasks.map((x) => (x.id === t.id ? { ...x, done: !!v } : x)))
+                  }
+                />
+                <div className="min-w-0 flex-1">
+                  <div className={`text-sm font-medium ${t.done ? "line-through" : ""}`}>
+                    {t.title}
+                  </div>
+                  {t.date && (
+                    <div className="text-xs text-muted-foreground">{formatDate(t.date)}</div>
+                  )}
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    setTasks(tasks.filter((x) => x.id !== t.id));
+                    toast.success("Tarefa removida");
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AreaTabs({
+  storageKey,
+  label,
+  children,
+}: {
+  storageKey: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tabs defaultValue="itens" className="w-full">
+      <TabsList className="bg-pink-100/60">
+        <TabsTrigger
+          value="itens"
+          className="data-[state=active]:bg-pink-600 data-[state=active]:text-white"
+        >
+          Itens
+        </TabsTrigger>
+        <TabsTrigger
+          value="tarefas"
+          className="data-[state=active]:bg-pink-600 data-[state=active]:text-white"
+        >
+          Tarefas
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="itens" className="mt-3">
+        {children}
+      </TabsContent>
+      <TabsContent value="tarefas" className="mt-3">
+        <TasksPanel storageKey={storageKey} label={label} />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
 const titleField: FieldDef = {
   key: "title",
   label: "Título",
