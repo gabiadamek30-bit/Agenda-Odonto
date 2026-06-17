@@ -82,8 +82,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "Agenda Odonto" },
       { name: "twitter:description", content: "Odonto Planner is a student agenda app for dentistry, organizing academic and personal schedules." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e4e8eb7c-507e-4696-82f8-b0ed7de6c072/id-preview-80d0bba1--2a164560-a805-4881-adf4-f73825564acd.lovable.app-1781737286074.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e4e8eb7c-507e-4696-82f8-b0ed7de6c072/id-preview-80d0bba1--2a164560-a805-4881-adf4-f73825564acd.lovable.app-1781737286074.png" },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/dxcJF1ZITxe9OD12450irJMg36k1/social-images/social-1781738608744-Gemini_Generated_Image_8yfr0h8yfr0h8yfr.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/dxcJF1ZITxe9OD12450irJMg36k1/social-images/social-1781738608744-Gemini_Generated_Image_8yfr0h8yfr0h8yfr.webp" },
     ],
     links: [
       {
