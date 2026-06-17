@@ -37,39 +37,56 @@ import {
   Plus,
   Pencil,
   FlaskConical,
-  Home,
   Bell,
   BellRing,
   Heart,
 } from "lucide-react";
 import { useLocalStorage, uid } from "@/lib/storage";
+import { CalendarView, type CalendarEvent } from "@/components/CalendarView";
+import { AllTasksView, useAllTasks } from "@/components/AllTasksView";
+import { Settings2 } from "lucide-react";
 
 type BaseItem = {
   id: string;
   title: string;
   date?: string;
   time?: string;
+  endTime?: string;
   notes?: string;
   done?: boolean;
   /** minutes before date+time to notify; "" or undefined = no reminder */
   reminder?: string;
 };
 
-type Clinica = BaseItem & { local?: string; paciente?: string; procedimento?: string };
-type Materia = BaseItem & { professor?: string; horario?: string };
-type Estagio = BaseItem & { local?: string; supervisor?: string };
+type Clinica = BaseItem & {
+  local?: string; paciente?: string; procedimento?: string;
+  recorrente?: boolean; diasSemana?: string[]; dataFim?: string;
+};
+type Materia = BaseItem & {
+  professor?: string;
+  recorrente?: boolean;
+  diasSemana?: string[];
+  dataFim?: string;
+};
+type Estagio = BaseItem & {
+  local?: string; supervisor?: string;
+  recorrente?: boolean; diasSemana?: string[]; dataFim?: string;
+};
+type IcReuniao = BaseItem & { orientador?: string; local?: string; pauta?: string };
+type IcPrazo = BaseItem & { tipo?: string; descricao?: string };
+type IcCongresso = BaseItem & { nome?: string; local?: string; submissao?: string };
 type Prova = BaseItem & { materia?: string; conteudo?: string };
 type Tbl = BaseItem & { materia?: string; tema?: string };
 type Trabalho = BaseItem & { materia?: string; entrega?: string };
-type Laboratorio = BaseItem & { local?: string; disciplina?: string; atividade?: string };
+type Laboratorio = BaseItem & { local?: string; disciplina?: string; atividade?: string; materiaId?: string };
 type Material = BaseItem & {
   quantidade?: string;
   categoria?: string;
   comprado?: boolean;
   clinicaIds?: string[];
   laboratorioIds?: string[];
+  materiaIds?: string[];
 };
-type IcItem = BaseItem & { tipo?: string; orientador?: string };
 type Pessoal = BaseItem & { categoria?: string; local?: string };
 
 const STORAGE_KEYS = {
@@ -126,9 +143,10 @@ function itemDateTime(i: BaseItem): Date | null {
 type FieldDef = {
   key: string;
   label: string;
-  type?: "text" | "date" | "time" | "textarea" | "select" | "multiselect" | "reminder";
+  type?: "text" | "date" | "time24" | "textarea" | "select" | "multiselect" | "reminder" | "checkbox" | "weekdays";
   options?: { value: string; label: string }[] | string[];
   placeholder?: string;
+  dependsOn?: { key: string; truthy: boolean };
 };
 
 function normalizeOptions(opts?: FieldDef["options"]) {
@@ -167,6 +185,91 @@ function ItemDialog<T extends Record<string, any>>({
         <div className="grid gap-3 py-2">
           {fields.map((f) => {
             const v = (draft as any)[f.key];
+
+            // conditional visibility
+            if (f.dependsOn) {
+              const depVal = !!(draft as any)[f.dependsOn.key];
+              if (depVal !== f.dependsOn.truthy) return null;
+            }
+
+            if (f.type === "checkbox") {
+              return (
+                <label key={f.key} className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-pink-100 bg-pink-50/40 px-3 py-2.5 hover:bg-pink-50">
+                  <Checkbox
+                    id={f.key}
+                    checked={!!v}
+                    onCheckedChange={(c) => setDraft({ ...draft, [f.key]: !!c })}
+                  />
+                  <span className="text-sm font-medium">{f.label}</span>
+                </label>
+              );
+            }
+
+            if (f.type === "weekdays") {
+              const selected: string[] = Array.isArray(v) ? v : [];
+              const days = [
+                { val: "1", label: "Seg" }, { val: "2", label: "Ter" },
+                { val: "3", label: "Qua" }, { val: "4", label: "Qui" },
+                { val: "5", label: "Sex" }, { val: "6", label: "Sáb" },
+                { val: "0", label: "Dom" },
+              ];
+              return (
+                <div key={f.key} className="grid gap-1.5">
+                  <Label>{f.label}</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {days.map((d) => (
+                      <button
+                        key={d.val}
+                        type="button"
+                        onClick={() => {
+                          const next = selected.includes(d.val)
+                            ? selected.filter((x) => x !== d.val)
+                            : [...selected, d.val];
+                          setDraft({ ...draft, [f.key]: next });
+                        }}
+                        className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                          selected.includes(d.val)
+                            ? "bg-pink-600 text-white"
+                            : "bg-pink-100 text-pink-700 hover:bg-pink-200"
+                        }`}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
+            if (f.type === "time24") {
+              return (
+                <div key={f.key} className="grid gap-1.5">
+                  <Label htmlFor={f.key}>{f.label}</Label>
+                  <Input
+                    id={f.key}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder={f.placeholder ?? "HH:MM"}
+                    maxLength={5}
+                    value={v ?? ""}
+                    onChange={(e) => {
+                      let val = e.target.value.replace(/[^0-9:]/g, "");
+                      if (val.length === 2 && !val.includes(":")) val += ":";
+                      setDraft({ ...draft, [f.key]: val });
+                    }}
+                    onBlur={(e) => {
+                      const m = e.target.value.match(/^(\d{1,2}):(\d{2})$/);
+                      if (m) {
+                        const h = Math.min(23, parseInt(m[1]));
+                        const mn = Math.min(59, parseInt(m[2]));
+                        setDraft({ ...draft, [f.key]: `${String(h).padStart(2, "0")}:${String(mn).padStart(2, "0")}` });
+                      }
+                    }}
+                  />
+                </div>
+              );
+            }
+
             if (f.type === "textarea") {
               return (
                 <div key={f.key} className="grid gap-1.5">
@@ -309,7 +412,11 @@ function Section<T extends BaseItem>({
 
   const emptyDraft = useMemo(() => {
     const d: any = { id: uid(), title: "" };
-    fields.forEach((f) => (d[f.key] = f.type === "multiselect" ? [] : ""));
+    fields.forEach((f) => {
+      if (f.type === "multiselect" || f.type === "weekdays") d[f.key] = [];
+      else if (f.type === "checkbox") d[f.key] = false;
+      else d[f.key] = "";
+    });
     return d as T;
   }, [fields]);
 
@@ -375,7 +482,7 @@ function Section<T extends BaseItem>({
                         <Badge variant="secondary" className="bg-pink-100 text-pink-800">
                           <CalendarDays className="mr-1 h-3 w-3" />
                           {formatDate(item.date)}
-                          {item.time ? ` · ${item.time}` : ""}
+                          {item.time ? ` · ${item.time}${item.endTime ? `–${item.endTime}` : ""}` : ""}
                         </Badge>
                       )}
                       {item.reminder && (
@@ -443,12 +550,22 @@ function Section<T extends BaseItem>({
   );
 }
 
-type Task = { id: string; title: string; done?: boolean; date?: string };
+type Task = { id: string; title: string; done?: boolean; date?: string; materiaId?: string };
 
-function TasksPanel({ storageKey, label }: { storageKey: string; label: string }) {
-  const [tasks, setTasks] = useLocalStorage<Task[]>(storageKey, []);
+function TasksPanel({
+  tasks,
+  setTasks,
+  label,
+  materias,
+}: {
+  tasks: Task[];
+  setTasks: (tasks: Task[]) => void;
+  label: string;
+  materias?: Array<{ id: string; title: string }>;
+}) {
   const [draft, setDraft] = useState("");
   const [draftDate, setDraftDate] = useState("");
+  const [draftMateriaId, setDraftMateriaId] = useState("");
 
   const add = () => {
     const t = draft.trim();
@@ -456,9 +573,10 @@ function TasksPanel({ storageKey, label }: { storageKey: string; label: string }
       toast.error("Escreva uma tarefa");
       return;
     }
-    setTasks([...tasks, { id: uid(), title: t, date: draftDate || undefined, done: false }]);
+    setTasks([...tasks, { id: uid(), title: t, date: draftDate || undefined, done: false, materiaId: draftMateriaId || undefined }]);
     setDraft("");
     setDraftDate("");
+    setDraftMateriaId("");
     toast.success("Tarefa adicionada");
   };
 
@@ -498,6 +616,19 @@ function TasksPanel({ storageKey, label }: { storageKey: string; label: string }
             onChange={(e) => setDraftDate(e.target.value)}
             className="sm:w-44"
           />
+          {materias && materias.length > 0 && (
+            <Select value={draftMateriaId} onValueChange={setDraftMateriaId}>
+              <SelectTrigger className="sm:w-40">
+                <SelectValue placeholder="Matéria (opt.)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Sem matéria</SelectItem>
+                {materias.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>{m.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Button onClick={add} className="bg-pink-600 hover:bg-pink-700">
             <Plus className="h-4 w-4" /> Adicionar
           </Button>
@@ -509,7 +640,9 @@ function TasksPanel({ storageKey, label }: { storageKey: string; label: string }
           </div>
         ) : (
           <ul className="grid gap-1.5">
-            {sorted.map((t) => (
+            {sorted.map((t) => {
+              const mat = t.materiaId && materias ? materias.find((m) => m.id === t.materiaId) : null;
+              return (
               <li
                 key={t.id}
                 className={`flex items-center gap-3 rounded-lg border bg-card p-2.5 transition ${
@@ -526,9 +659,10 @@ function TasksPanel({ storageKey, label }: { storageKey: string; label: string }
                   <div className={`text-sm font-medium ${t.done ? "line-through" : ""}`}>
                     {t.title}
                   </div>
-                  {t.date && (
-                    <div className="text-xs text-muted-foreground">{formatDate(t.date)}</div>
-                  )}
+                  <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                    {t.date && <span className="text-xs text-muted-foreground">{formatDate(t.date)}</span>}
+                    {mat && <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 text-xs">{mat.title}</Badge>}
+                  </div>
                 </div>
                 <Button
                   size="icon"
@@ -541,7 +675,8 @@ function TasksPanel({ storageKey, label }: { storageKey: string; label: string }
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </li>
-            ))}
+            );
+            })}
           </ul>
         )}
       </CardContent>
@@ -550,35 +685,31 @@ function TasksPanel({ storageKey, label }: { storageKey: string; label: string }
 }
 
 function AreaTabs({
-  storageKey,
+  tasks,
+  setTasks,
   label,
+  materias,
   children,
 }: {
-  storageKey: string;
+  tasks: Task[];
+  setTasks: (tasks: Task[]) => void;
   label: string;
+  materias?: Array<{ id: string; title: string }>;
   children: React.ReactNode;
 }) {
   return (
     <Tabs defaultValue="itens" className="w-full">
       <TabsList className="bg-pink-100/60">
-        <TabsTrigger
-          value="itens"
-          className="data-[state=active]:bg-pink-600 data-[state=active]:text-white"
-        >
+        <TabsTrigger value="itens" className="data-[state=active]:bg-pink-600 data-[state=active]:text-white">
           Itens
         </TabsTrigger>
-        <TabsTrigger
-          value="tarefas"
-          className="data-[state=active]:bg-pink-600 data-[state=active]:text-white"
-        >
+        <TabsTrigger value="tarefas" className="data-[state=active]:bg-pink-600 data-[state=active]:text-white">
           Tarefas
         </TabsTrigger>
       </TabsList>
-      <TabsContent value="itens" className="mt-3">
-        {children}
-      </TabsContent>
+      <TabsContent value="itens" className="mt-3">{children}</TabsContent>
       <TabsContent value="tarefas" className="mt-3">
-        <TasksPanel storageKey={storageKey} label={label} />
+        <TasksPanel tasks={tasks} setTasks={setTasks} label={label} materias={materias} />
       </TabsContent>
     </Tabs>
   );
@@ -590,7 +721,8 @@ const titleField: FieldDef = {
   placeholder: "Ex.: Restauração canal 26",
 };
 const dateField: FieldDef = { key: "date", label: "Data", type: "date" };
-const timeField: FieldDef = { key: "time", label: "Horário", type: "time" };
+const timeField: FieldDef = { key: "time", label: "Início", type: "time24", placeholder: "HH:MM" };
+const endTimeField: FieldDef = { key: "endTime", label: "Fim", type: "time24", placeholder: "HH:MM" };
 const reminderField: FieldDef = { key: "reminder", label: "Lembrete", type: "reminder" };
 const notesField: FieldDef = { key: "notes", label: "Observações", type: "textarea" };
 
@@ -606,9 +738,25 @@ export default function AgendaApp() {
     [],
   );
   const [materiais, setMateriais] = useLocalStorage<Material[]>(STORAGE_KEYS.materiais, []);
-  const [ic, setIc] = useLocalStorage<IcItem[]>(STORAGE_KEYS.ic, []);
   const [pessoal, setPessoal] = useLocalStorage<Pessoal[]>(STORAGE_KEYS.pessoal, []);
-  const [tab, setTab] = useState("inicio");
+  const [icReunioes, setIcReunioes] = useLocalStorage<IcReuniao[]>("agenda.ic.reunioes", []);
+  const [icPrazos, setIcPrazos] = useLocalStorage<IcPrazo[]>("agenda.ic.prazos", []);
+  const [icCongressos, setIcCongressos] = useLocalStorage<IcCongresso[]>("agenda.ic.congressos", []);
+  const [icTitulo, setIcTitulo] = useLocalStorage<string>(
+    "agenda.ic.titulo",
+    "Avaliação do Impacto do Flash versus Luz de Refletor na Captura de Imagens para Treinamento de Redes Neurais na Detecção e Classificação de Lesões Brancas da Cavidade Oral",
+  );
+  const [icEditingTitle, setIcEditingTitle] = useState(false);
+  const [icTituloDraft, setIcTituloDraft] = useState(icTitulo);
+  const [tab, setTab] = useState("agenda");
+  const taskGroups = useAllTasks();
+
+  const [appConfig, setAppConfig] = useLocalStorage<{ name: string; subtitle: string; emoji: string }>(
+    "agenda.config",
+    { name: "Agenda Odonto", subtitle: "Tudo da faculdade num só lugar.", emoji: "🦷" },
+  );
+  const [editingHeader, setEditingHeader] = useState(false);
+  const [headerDraft, setHeaderDraft] = useState(appConfig);
 
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
     typeof window !== "undefined" && "Notification" in window
@@ -618,31 +766,81 @@ export default function AgendaApp() {
 
   const allDated = useMemo(
     () => [
-      ...clinica.map((i) => ({ kind: "Clínica", tab: "clinica", item: i as BaseItem })),
-      ...estagio.map((i) => ({ kind: "Estágio", tab: "estagio", item: i as BaseItem })),
+      ...clinica.filter((i) => !i.recorrente).map((i) => ({ kind: "Clínica", tab: "clinica", item: i as BaseItem })),
+      ...estagio.filter((i) => !i.recorrente).map((i) => ({ kind: "Estágio", tab: "estagio", item: i as BaseItem })),
+      ...materias.filter((m) => !m.recorrente).map((i) => ({ kind: "Matéria", tab: "materias", item: i as BaseItem })),
       ...provas.map((i) => ({ kind: "Prova", tab: "provas", item: i as BaseItem })),
       ...tbl.map((i) => ({ kind: "TBL", tab: "tbl", item: i as BaseItem })),
       ...trabalhos.map((i) => ({ kind: "Trabalho", tab: "trabalhos", item: i as BaseItem })),
       ...laboratorios.map((i) => ({ kind: "Laboratório", tab: "laboratorios", item: i as BaseItem })),
-      ...ic.map((i) => ({ kind: "IC", tab: "ic", item: i as BaseItem })),
       ...pessoal.map((i) => ({ kind: "Pessoal", tab: "pessoal", item: i as BaseItem })),
+      ...icReunioes.map((i) => ({ kind: "IC", tab: "ic", item: i as BaseItem })),
+      ...icPrazos.map((i) => ({ kind: "IC", tab: "ic", item: i as BaseItem })),
+      ...icCongressos.map((i) => ({ kind: "IC", tab: "ic", item: i as BaseItem })),
     ],
-    [clinica, estagio, provas, tbl, trabalhos, laboratorios, ic, pessoal],
+    [clinica, estagio, materias, provas, tbl, trabalhos, laboratorios, pessoal, icReunioes, icPrazos, icCongressos],
   );
 
-  const upcoming = useMemo(() => {
-    const now = new Date();
-    return allDated
-      .filter((x) => {
-        if (!x.item.date || x.item.done) return false;
-        const dt = itemDateTime(x.item);
-        return dt ? dt.getTime() >= now.getTime() - 12 * 60 * 60 * 1000 : false;
-      })
-      .sort(
-        (a, b) =>
-          (itemDateTime(a.item)?.getTime() ?? 0) - (itemDateTime(b.item)?.getTime() ?? 0),
-      );
-  }, [allDated]);
+  const calendarEvents = useMemo<CalendarEvent[]>(() => {
+    // regular dated events
+    const events: CalendarEvent[] = allDated
+      .filter((x) => x.item.date && !x.item.done)
+      .map((x) => ({
+        id: x.item.id,
+        title: x.item.title,
+        date: x.item.date!,
+        time: x.item.time,
+        endTime: x.item.endTime,
+        kind: x.kind,
+        tab: x.tab,
+      }));
+
+    // helper: expand recurring item into calendar events
+    const winStart = new Date();
+    winStart.setDate(winStart.getDate() - 30);
+    winStart.setHours(0, 0, 0, 0);
+    const expandRecurring = (
+      item: { id: string; title: string; recorrente?: boolean; diasSemana?: string[]; time?: string; endTime?: string; dataFim?: string },
+      kind: string,
+      tab: string,
+    ) => {
+      if (!item.recorrente || !item.diasSemana?.length) return;
+      const winEnd = item.dataFim
+        ? new Date(item.dataFim + "T23:59:59")
+        : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+      const diasSet = new Set(item.diasSemana.map(Number));
+      const cur = new Date(winStart);
+      while (cur <= winEnd) {
+        if (diasSet.has(cur.getDay())) {
+          const ds = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
+          events.push({ id: `${item.id}-${ds}`, title: item.title, date: ds, time: item.time, endTime: item.endTime, kind, tab });
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+    };
+
+    // expand recurring matérias (non-recurring ones are in allDated via date field)
+    materias.forEach((m) => expandRecurring(m, "Matéria", "materias"));
+    // expand recurring clínica and estágio
+    clinica.forEach((c) => expandRecurring(c, "Clínica", "clinica"));
+    estagio.forEach((e) => expandRecurring(e, "Estágio", "estagio"));
+
+    // dated tasks (all-day)
+    taskGroups.forEach((g) => {
+      g.tasks.filter((t) => t.date && !t.done).forEach((t) => {
+        events.push({
+          id: `task-${t.id}`,
+          title: t.title,
+          date: t.date!,
+          time: undefined,
+          kind: "Tarefa",
+          tab: "tarefas",
+        });
+      });
+    });
+
+    return events;
+  }, [allDated, materias, clinica, estagio, icReunioes, icPrazos, icCongressos, taskGroups]);
 
   // === Notifications loop ===
   useEffect(() => {
@@ -725,54 +923,83 @@ export default function AgendaApp() {
       })),
     [laboratorios],
   );
-
-  const counts = {
-    clinica: clinica.length,
-    materias: materias.length,
-    estagio: estagio.length,
-    provas: provas.length,
-    tbl: tbl.length,
-    trabalhos: trabalhos.length,
-    laboratorios: laboratorios.length,
-    materiais: materiais.filter((m) => !m.comprado).length,
-    ic: ic.length,
-    pessoal: pessoal.length,
-  };
-
-  const quickTabs: Array<{
-    key: string;
-    label: string;
-    icon: React.ComponentType<{ className?: string }>;
-    count: number;
-  }> = [
-    { key: "clinica", label: "Clínica", icon: Stethoscope, count: counts.clinica },
-    { key: "laboratorios", label: "Laboratórios", icon: FlaskConical, count: counts.laboratorios },
-    { key: "materias", label: "Matérias", icon: BookOpen, count: counts.materias },
-    { key: "estagio", label: "Estágio", icon: Briefcase, count: counts.estagio },
-    { key: "provas", label: "Provas", icon: FileText, count: counts.provas },
-    { key: "tbl", label: "TBL", icon: Users, count: counts.tbl },
-    { key: "trabalhos", label: "Trabalhos", icon: ClipboardList, count: counts.trabalhos },
-    { key: "materiais", label: "Materiais", icon: Package, count: counts.materiais },
-    { key: "ic", label: "IC", icon: Microscope, count: counts.ic },
-    { key: "pessoal", label: "Pessoal", icon: Heart, count: counts.pessoal },
-  ];
+  const materiaOptions = useMemo(
+    () => materias.map((m) => ({ value: m.id, label: m.title })),
+    [materias],
+  );
+  const materiaTitleOptions = useMemo(
+    () => materias.map((m) => ({ value: m.title, label: m.title })),
+    [materias],
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-pink-50 via-rose-50 to-white">
       <Toaster richColors position="top-center" />
-      <header className="border-b border-pink-100/80 bg-white/60 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-5">
-          <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-pink-600 p-2 text-white shadow-sm">
-              <Stethoscope className="h-6 w-6" />
+
+      {/* Header config dialog */}
+      <Dialog open={editingHeader} onOpenChange={setEditingHeader}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Personalizar cabeçalho</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="grid gap-1.5">
+              <Label>Emoji</Label>
+              <Input
+                value={headerDraft.emoji}
+                onChange={(e) => setHeaderDraft({ ...headerDraft, emoji: e.target.value })}
+                placeholder="🦷"
+                maxLength={4}
+                className="w-20 text-center text-xl"
+              />
             </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight">Agenda Odonto</h1>
-              <p className="text-sm text-muted-foreground">
-                Tudo da faculdade num só lugar.
-              </p>
+            <div className="grid gap-1.5">
+              <Label>Nome</Label>
+              <Input
+                value={headerDraft.name}
+                onChange={(e) => setHeaderDraft({ ...headerDraft, name: e.target.value })}
+                placeholder="Agenda"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Subtítulo</Label>
+              <Input
+                value={headerDraft.subtitle}
+                onChange={(e) => setHeaderDraft({ ...headerDraft, subtitle: e.target.value })}
+                placeholder="Para a mais linda"
+              />
             </div>
           </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingHeader(false)}>Cancelar</Button>
+            <Button
+              className="bg-pink-600 hover:bg-pink-700"
+              onClick={() => { setAppConfig(headerDraft); setEditingHeader(false); }}
+            >
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <header className="border-b border-pink-100/80 bg-white/60 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-4">
+          <button
+            onClick={() => { setHeaderDraft(appConfig); setEditingHeader(true); }}
+            className="group flex items-center gap-3 rounded-xl px-1 py-1 transition hover:bg-pink-50"
+            title="Personalizar"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 text-2xl shadow-sm">
+              {appConfig.emoji}
+            </div>
+            <div className="text-left">
+              <h1 className="bg-gradient-to-r from-pink-600 to-rose-500 bg-clip-text text-xl font-bold tracking-tight text-transparent">
+                {appConfig.name}
+              </h1>
+              <p className="text-xs text-muted-foreground">{appConfig.subtitle}</p>
+            </div>
+            <Settings2 className="ml-1 h-3.5 w-3.5 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
+          </button>
           {notifPermission !== "granted" && (
             <Button
               variant="outline"
@@ -789,8 +1016,11 @@ export default function AgendaApp() {
       <main className="mx-auto max-w-5xl px-4 py-6">
         <Tabs value={tab} onValueChange={setTab} className="w-full">
           <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 bg-pink-100/60 p-1">
-            <TabsTrigger value="inicio" className="data-[state=active]:bg-pink-600 data-[state=active]:text-white">
-              <Home className="mr-1 h-4 w-4" />Início
+            <TabsTrigger value="agenda" className="data-[state=active]:bg-pink-600 data-[state=active]:text-white">
+              <CalendarDays className="mr-1 h-4 w-4" />Agenda
+            </TabsTrigger>
+            <TabsTrigger value="tarefas" className="data-[state=active]:bg-pink-600 data-[state=active]:text-white">
+              <ClipboardList className="mr-1 h-4 w-4" />Tarefas
             </TabsTrigger>
             <TabsTrigger value="clinica"><Stethoscope className="mr-1 h-4 w-4" />Clínica</TabsTrigger>
             <TabsTrigger value="laboratorios"><FlaskConical className="mr-1 h-4 w-4" />Laboratórios</TabsTrigger>
@@ -806,103 +1036,19 @@ export default function AgendaApp() {
             <TabsTrigger value="pessoal"><Heart className="mr-1 h-4 w-4" />Pessoal</TabsTrigger>
           </TabsList>
 
-          {/* ============= INÍCIO ============= */}
-          <TabsContent value="inicio" className="mt-4 space-y-4">
-            <Card className="border-pink-200 bg-gradient-to-r from-pink-100 to-rose-50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-pink-800">
-                  <CalendarDays className="h-5 w-5" /> Próximos compromissos
-                </CardTitle>
-                <p className="text-sm text-pink-900/70">
-                  Tudo da sua agenda em ordem cronológica.
-                </p>
-              </CardHeader>
-              <CardContent>
-                {upcoming.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-pink-200 bg-white/60 py-8 text-center text-sm text-muted-foreground">
-                    Sem compromissos próximos. Aproveita pra descansar 💗
-                  </div>
-                ) : (
-                  <ul className="grid gap-2 sm:grid-cols-2">
-                    {upcoming.slice(0, 10).map(({ kind, tab: t, item }) => (
-                      <li
-                        key={item.id + kind}
-                        className="flex cursor-pointer items-center justify-between rounded-lg border border-pink-100 bg-white px-3 py-2 transition hover:border-pink-300"
-                        onClick={() => setTab(t)}
-                      >
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-medium">{item.title}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {formatDate(item.date)}
-                            {item.time ? ` · ${item.time}` : ""}
-                          </div>
-                        </div>
-                        <Badge className="bg-pink-600 hover:bg-pink-600">{kind}</Badge>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
+          {/* ============= AGENDA ============= */}
+          <TabsContent value="agenda" className="mt-4">
+            <CalendarView events={calendarEvents} onEventClick={(t) => setTab(t)} />
+          </TabsContent>
 
-            <Card className="border-pink-100">
-              <CardHeader>
-                <CardTitle className="text-base">Acesso rápido</CardTitle>
-                <p className="text-sm text-muted-foreground">Entre direto na área que quiser.</p>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                  {quickTabs.map(({ key, label, icon: Icon, count }) => (
-                    <button
-                      key={key}
-                      onClick={() => setTab(key)}
-                      className="group flex flex-col items-start gap-2 rounded-xl border border-pink-100 bg-white p-3 text-left transition hover:border-pink-300 hover:bg-pink-50"
-                    >
-                      <div className="flex w-full items-center justify-between">
-                        <div className="rounded-lg bg-pink-100 p-2 text-pink-700 transition group-hover:bg-pink-600 group-hover:text-white">
-                          <Icon className="h-4 w-4" />
-                        </div>
-                        <span className="text-xs font-semibold text-pink-700">{count}</span>
-                      </div>
-                      <span className="text-sm font-medium">{label}</span>
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {materiais.filter((m) => !m.comprado).length > 0 && (
-              <Card className="border-pink-100">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Package className="h-5 w-5 text-pink-600" /> Materiais pendentes
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="grid gap-1.5 text-sm">
-                    {materiais
-                      .filter((m) => !m.comprado)
-                      .slice(0, 6)
-                      .map((m) => (
-                        <li
-                          key={m.id}
-                          className="flex items-center justify-between rounded-md border border-pink-100 bg-pink-50/40 px-3 py-1.5"
-                        >
-                          <span>{m.title}</span>
-                          {m.quantidade && (
-                            <span className="text-xs text-muted-foreground">{m.quantidade}</span>
-                          )}
-                        </li>
-                      ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            )}
+          {/* ============= TAREFAS ============= */}
+          <TabsContent value="tarefas" className="mt-4">
+            <AllTasksView categories={taskGroups} materias={materias} />
           </TabsContent>
 
           {/* ============= CLÍNICA ============= */}
           <TabsContent value="clinica" className="mt-4">
-            <AreaTabs storageKey="agenda.tasks.clinica" label="Clínica">
+            <AreaTabs tasks={taskGroups[0].tasks} setTasks={taskGroups[0].setTasks} label="Clínica" materias={materias}>
             <Section<Clinica>
               title="Dias de Clínica"
               description="Agende seus atendimentos, pacientes e procedimentos."
@@ -911,8 +1057,12 @@ export default function AgendaApp() {
               setItems={setClinica}
               fields={[
                 titleField,
-                dateField,
+                { key: "recorrente", label: "Evento recorrente (repete toda semana)", type: "checkbox" },
+                { key: "diasSemana", label: "Dias da semana", type: "weekdays", dependsOn: { key: "recorrente", truthy: true } },
+                { key: "dataFim", label: "Repetir até", type: "date", dependsOn: { key: "recorrente", truthy: true } },
+                { ...dateField, dependsOn: { key: "recorrente", truthy: false } } as FieldDef,
                 timeField,
+                endTimeField,
                 reminderField,
                 { key: "local", label: "Clínica / Sala", placeholder: "Clínica 2 — Box 4" },
                 { key: "paciente", label: "Paciente" },
@@ -921,6 +1071,7 @@ export default function AgendaApp() {
               ]}
               renderMeta={(i) => (
                 <>
+                  {i.recorrente && <Badge className="mr-1 bg-pink-100 text-pink-700 hover:bg-pink-100">Recorrente</Badge>}
                   {i.local && <span>{i.local}</span>}
                   {i.paciente && <span> · {i.paciente}</span>}
                   {i.procedimento && <span> · {i.procedimento}</span>}
@@ -932,7 +1083,7 @@ export default function AgendaApp() {
 
           {/* ============= LABORATÓRIOS ============= */}
           <TabsContent value="laboratorios" className="mt-4">
-            <AreaTabs storageKey="agenda.tasks.laboratorios" label="Laboratórios">
+            <AreaTabs tasks={taskGroups[1].tasks} setTasks={taskGroups[1].setTasks} label="Laboratórios" materias={materias}>
             <Section<Laboratorio>
               title="Laboratórios"
               description="Práticas e aulas de laboratório."
@@ -941,30 +1092,36 @@ export default function AgendaApp() {
               setItems={setLaboratorios}
               fields={[
                 { ...titleField, placeholder: "Ex.: Lab. Dentística — enceramento" },
+                { key: "materiaId", label: "Matéria", type: "select", options: materiaOptions, placeholder: "Selecione a matéria" },
                 dateField,
                 timeField,
+                endTimeField,
                 reminderField,
                 { key: "local", label: "Local / Sala" },
                 { key: "disciplina", label: "Disciplina" },
                 { key: "atividade", label: "Atividade", placeholder: "Ex.: Enceramento, Anatomia dental" },
                 notesField,
               ]}
-              renderMeta={(i) => (
-                <>
-                  {i.disciplina && <span>{i.disciplina}</span>}
-                  {i.local && <span> · {i.local}</span>}
-                  {i.atividade && <span> · {i.atividade}</span>}
-                </>
-              )}
+              renderMeta={(i) => {
+                const mat = i.materiaId ? materias.find((m) => m.id === i.materiaId) : null;
+                return (
+                  <>
+                    {mat && <Badge variant="outline" className="mr-1 border-blue-200 text-blue-700">{mat.title}</Badge>}
+                    {i.disciplina && <span>{i.disciplina}</span>}
+                    {i.local && <span> · {i.local}</span>}
+                    {i.atividade && <span> · {i.atividade}</span>}
+                  </>
+                );
+              }}
             />
           </AreaTabs>
           </TabsContent>
 
           <TabsContent value="materias" className="mt-4">
-            <AreaTabs storageKey="agenda.tasks.materias" label="Matérias">
+            <AreaTabs tasks={taskGroups[2].tasks} setTasks={taskGroups[2].setTasks} label="Matérias" materias={materias}>
             <Section<Materia>
               title="Matérias"
-              description="Disciplinas do semestre, professores e horários."
+              description="Disciplinas do semestre — eventos vão automaticamente para a agenda."
               icon={BookOpen}
               items={materias}
               setItems={setMaterias}
@@ -972,13 +1129,22 @@ export default function AgendaApp() {
               fields={[
                 { ...titleField, placeholder: "Ex.: Dentística II" },
                 { key: "professor", label: "Professor(a)" },
-                { key: "horario", label: "Horário semanal", placeholder: "Seg 14h–18h" },
+                { key: "recorrente", label: "Evento recorrente (repete toda semana)", type: "checkbox" },
+                { key: "diasSemana", label: "Dias da semana", type: "weekdays", dependsOn: { key: "recorrente", truthy: true } },
+                { key: "dataFim", label: "Repetir até", type: "date", dependsOn: { key: "recorrente", truthy: true } },
+                { ...dateField, dependsOn: { key: "recorrente", truthy: false } } as FieldDef,
+                timeField,
+                endTimeField,
+                reminderField,
                 notesField,
               ]}
               renderMeta={(i) => (
                 <>
                   {i.professor && <span>Prof. {i.professor}</span>}
-                  {i.horario && <span> · {i.horario}</span>}
+                  {i.recorrente
+                    ? <Badge className="ml-1 bg-blue-100 text-blue-700 hover:bg-blue-100">Recorrente</Badge>
+                    : i.date && <Badge variant="secondary" className="ml-1 bg-blue-50 text-blue-700">{formatDate(i.date)}{i.time ? ` · ${i.time}${i.endTime ? `–${i.endTime}` : ""}` : ""}</Badge>
+                  }
                 </>
               )}
             />
@@ -986,7 +1152,7 @@ export default function AgendaApp() {
           </TabsContent>
 
           <TabsContent value="estagio" className="mt-4">
-            <AreaTabs storageKey="agenda.tasks.estagio" label="Estágio">
+            <AreaTabs tasks={taskGroups[3].tasks} setTasks={taskGroups[3].setTasks} label="Estágio" materias={materias}>
             <Section<Estagio>
               title="Estágio"
               description="Plantões, supervisores e locais de estágio."
@@ -995,8 +1161,12 @@ export default function AgendaApp() {
               setItems={setEstagio}
               fields={[
                 titleField,
-                dateField,
+                { key: "recorrente", label: "Evento recorrente (repete toda semana)", type: "checkbox" },
+                { key: "diasSemana", label: "Dias da semana", type: "weekdays", dependsOn: { key: "recorrente", truthy: true } },
+                { key: "dataFim", label: "Repetir até", type: "date", dependsOn: { key: "recorrente", truthy: true } },
+                { ...dateField, dependsOn: { key: "recorrente", truthy: false } } as FieldDef,
                 timeField,
+                endTimeField,
                 reminderField,
                 { key: "local", label: "Local", placeholder: "UBS / Hospital / Clínica" },
                 { key: "supervisor", label: "Supervisor(a)" },
@@ -1004,6 +1174,7 @@ export default function AgendaApp() {
               ]}
               renderMeta={(i) => (
                 <>
+                  {i.recorrente && <Badge className="mr-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Recorrente</Badge>}
                   {i.local && <span>{i.local}</span>}
                   {i.supervisor && <span> · Sup. {i.supervisor}</span>}
                 </>
@@ -1013,7 +1184,7 @@ export default function AgendaApp() {
           </TabsContent>
 
           <TabsContent value="provas" className="mt-4">
-            <AreaTabs storageKey="agenda.tasks.provas" label="Provas">
+            <AreaTabs tasks={taskGroups[4].tasks} setTasks={taskGroups[4].setTasks} label="Provas" materias={materias}>
             <Section<Prova>
               title="Provas"
               description="Datas de avaliações e conteúdos cobrados."
@@ -1022,9 +1193,10 @@ export default function AgendaApp() {
               setItems={setProvas}
               fields={[
                 { ...titleField, placeholder: "P1 — Endodontia" },
-                { key: "materia", label: "Matéria" },
+                { key: "materia", label: "Matéria", type: "select", options: materiaTitleOptions, placeholder: "Selecione ou deixe em branco" },
                 dateField,
                 timeField,
+                endTimeField,
                 reminderField,
                 { key: "conteudo", label: "Conteúdo", type: "textarea", placeholder: "Capítulos, slides..." },
                 notesField,
@@ -1042,7 +1214,7 @@ export default function AgendaApp() {
           </TabsContent>
 
           <TabsContent value="tbl" className="mt-4">
-            <AreaTabs storageKey="agenda.tasks.tbl" label="TBL">
+            <AreaTabs tasks={taskGroups[5].tasks} setTasks={taskGroups[5].setTasks} label="TBL" materias={materias}>
             <Section<Tbl>
               title="TBL"
               description="Team-Based Learning: temas e datas."
@@ -1051,10 +1223,11 @@ export default function AgendaApp() {
               setItems={setTbl}
               fields={[
                 { ...titleField, placeholder: "TBL — Periodontia" },
-                { key: "materia", label: "Matéria" },
+                { key: "materia", label: "Matéria", type: "select", options: materiaTitleOptions, placeholder: "Selecione ou deixe em branco" },
                 { key: "tema", label: "Tema" },
                 dateField,
                 timeField,
+                endTimeField,
                 reminderField,
                 notesField,
               ]}
@@ -1069,7 +1242,7 @@ export default function AgendaApp() {
           </TabsContent>
 
           <TabsContent value="trabalhos" className="mt-4">
-            <AreaTabs storageKey="agenda.tasks.trabalhos" label="Trabalhos">
+            <AreaTabs tasks={taskGroups[6].tasks} setTasks={taskGroups[6].setTasks} label="Trabalhos" materias={materias}>
             <Section<Trabalho>
               title="Trabalhos"
               description="Atividades, seminários e entregas."
@@ -1078,10 +1251,11 @@ export default function AgendaApp() {
               setItems={setTrabalhos}
               fields={[
                 titleField,
-                { key: "materia", label: "Matéria" },
+                { key: "materia", label: "Matéria", type: "select", options: materiaTitleOptions, placeholder: "Selecione ou deixe em branco" },
                 { key: "entrega", label: "Tipo de entrega", placeholder: "Apresentação, PDF, Moodle…" },
                 dateField,
                 timeField,
+                endTimeField,
                 reminderField,
                 notesField,
               ]}
@@ -1096,7 +1270,7 @@ export default function AgendaApp() {
           </TabsContent>
 
           <TabsContent value="materiais" className="mt-4">
-            <AreaTabs storageKey="agenda.tasks.materiais" label="Materiais">
+            <AreaTabs tasks={taskGroups[7].tasks} setTasks={taskGroups[7].setTasks} label="Materiais" materias={materias}>
             <Section<Material>
               title="Lista de Materiais"
               description="O que comprar e levar — vincule a dias de clínica e laboratório."
@@ -1125,6 +1299,12 @@ export default function AgendaApp() {
                   type: "multiselect",
                   options: labOptions,
                 },
+                {
+                  key: "materiaIds",
+                  label: "Matérias relacionadas",
+                  type: "multiselect",
+                  options: materiaOptions,
+                },
                 notesField,
               ]}
               renderMeta={(i) => {
@@ -1134,6 +1314,9 @@ export default function AgendaApp() {
                 const linkedLab = (i.laboratorioIds || [])
                   .map((id) => laboratorios.find((l) => l.id === id))
                   .filter(Boolean) as Laboratorio[];
+                const linkedMaterias = (i.materiaIds || [])
+                  .map((id) => materias.find((m) => m.id === id))
+                  .filter(Boolean) as Materia[];
                 return (
                   <div className="flex flex-wrap items-center gap-1">
                     {i.categoria && (
@@ -1158,6 +1341,12 @@ export default function AgendaApp() {
                         {l.date ? ` · ${formatDate(l.date)}` : ""}
                       </Badge>
                     ))}
+                    {linkedMaterias.map((m) => (
+                      <Badge key={m.id} className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                        <BookOpen className="mr-1 h-3 w-3" />
+                        {m.title}
+                      </Badge>
+                    ))}
                   </div>
                 );
               }}
@@ -1166,58 +1355,141 @@ export default function AgendaApp() {
           </TabsContent>
 
           <TabsContent value="ic" className="mt-4">
-            <AreaTabs storageKey="agenda.tasks.ic" label="IC">
-            <Card className="mb-4 border-pink-200 bg-gradient-to-r from-pink-100 to-rose-50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-pink-800">
-                  <Microscope className="h-5 w-5" /> Iniciação Científica
-                </CardTitle>
-                <p className="text-sm text-pink-900/70">
-                  Espaço exclusivo para sua IC: reuniões, leituras, coletas, escrita e prazos.
-                </p>
-              </CardHeader>
+            {/* IC Title card */}
+            <Card className="mb-4 border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50">
+              <CardContent className="pt-4">
+                <div className="flex items-start gap-3">
+                  <Microscope className="mt-1 h-5 w-5 shrink-0 text-indigo-600" />
+                  <div className="flex-1 min-w-0">
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-indigo-600">Título da IC</p>
+                    {icEditingTitle ? (
+                      <div className="flex flex-col gap-2">
+                        <Textarea
+                          value={icTituloDraft}
+                          onChange={(e) => setIcTituloDraft(e.target.value)}
+                          rows={3}
+                          className="text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                            onClick={() => { setIcTitulo(icTituloDraft); setIcEditingTitle(false); }}
+                          >
+                            Salvar
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => { setIcTituloDraft(icTitulo); setIcEditingTitle(false); }}>
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        className="group flex w-full items-start gap-2 text-left"
+                        onClick={() => { setIcTituloDraft(icTitulo); setIcEditingTitle(true); }}
+                      >
+                        <span className="text-sm font-medium leading-snug text-foreground">{icTitulo}</span>
+                        <Pencil className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
             </Card>
-            <Section<IcItem>
-              title="Atividades da IC"
-              description="Tudo relacionado ao seu projeto de pesquisa."
-              icon={Microscope}
-              items={ic}
-              setItems={setIc}
-              fields={[
-                { ...titleField, placeholder: "Reunião com orientador" },
-                {
-                  key: "tipo",
-                  label: "Tipo",
-                  type: "select",
-                  options: [
-                    "Reunião",
-                    "Leitura de artigo",
-                    "Coleta de dados",
-                    "Análise",
-                    "Escrita",
-                    "Submissão",
-                    "Apresentação",
-                    "Outro",
-                  ],
-                },
-                { key: "orientador", label: "Orientador(a)" },
-                dateField,
-                timeField,
-                reminderField,
-                notesField,
-              ]}
-              renderMeta={(i) => (
-                <>
-                  {i.tipo && <Badge variant="outline" className="mr-1">{i.tipo}</Badge>}
-                  {i.orientador && <span>Orient. {i.orientador}</span>}
-                </>
-              )}
-            />
-          </AreaTabs>
+
+            {/* IC sub-tabs */}
+            <Tabs defaultValue="tarefas" className="w-full">
+              <TabsList className="bg-indigo-100/60">
+                <TabsTrigger value="tarefas" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white">Tarefas</TabsTrigger>
+                <TabsTrigger value="reunioes" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white">Reuniões</TabsTrigger>
+                <TabsTrigger value="prazos" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white">Prazos</TabsTrigger>
+                <TabsTrigger value="congressos" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white">Congressos</TabsTrigger>
+              </TabsList>
+              <TabsContent value="tarefas" className="mt-3">
+                <TasksPanel tasks={taskGroups[8].tasks} setTasks={taskGroups[8].setTasks} label="IC" materias={materias} />
+              </TabsContent>
+              <TabsContent value="reunioes" className="mt-3">
+                <Section<IcReuniao>
+                  title="Reuniões"
+                  description="Reuniões com orientador e colaboradores."
+                  icon={Users}
+                  items={icReunioes}
+                  setItems={setIcReunioes}
+                  fields={[
+                    { ...titleField, placeholder: "Reunião de orientação" },
+                    { key: "orientador", label: "Orientador(a)" },
+                    { key: "local", label: "Local / Link", placeholder: "Sala 204 ou Meet" },
+                    { key: "pauta", label: "Pauta", type: "textarea", placeholder: "Tópicos a discutir..." },
+                    dateField,
+                    timeField,
+                    endTimeField,
+                    reminderField,
+                    notesField,
+                  ]}
+                  renderMeta={(i) => (
+                    <>
+                      {i.orientador && <span>Orient. {i.orientador}</span>}
+                      {i.local && <span> · {i.local}</span>}
+                    </>
+                  )}
+                />
+              </TabsContent>
+              <TabsContent value="prazos" className="mt-3">
+                <Section<IcPrazo>
+                  title="Prazos"
+                  description="Entregas, submissões e datas-limite."
+                  icon={CalendarDays}
+                  items={icPrazos}
+                  setItems={setIcPrazos}
+                  fields={[
+                    { ...titleField, placeholder: "Entrega do relatório" },
+                    { key: "tipo", label: "Tipo", type: "select", options: ["Relatório", "Artigo", "Resumo", "Apresentação", "Outro"] },
+                    { key: "descricao", label: "Descrição", type: "textarea" },
+                    dateField,
+                    timeField,
+                    endTimeField,
+                    reminderField,
+                    notesField,
+                  ]}
+                  renderMeta={(i) => (
+                    <>
+                      {i.tipo && <Badge variant="outline" className="mr-1 border-indigo-200 text-indigo-700">{i.tipo}</Badge>}
+                      {i.descricao && <span>{i.descricao.slice(0, 60)}{i.descricao.length > 60 ? "…" : ""}</span>}
+                    </>
+                  )}
+                />
+              </TabsContent>
+              <TabsContent value="congressos" className="mt-3">
+                <Section<IcCongresso>
+                  title="Congressos"
+                  description="Eventos científicos, submissões e inscrições."
+                  icon={Briefcase}
+                  items={icCongressos}
+                  setItems={setIcCongressos}
+                  fields={[
+                    { ...titleField, placeholder: "JORNADA SBPQO 2025" },
+                    { key: "nome", label: "Nome completo do evento" },
+                    { key: "local", label: "Local / Cidade" },
+                    { key: "submissao", label: "Prazo de submissão", type: "date" },
+                    dateField,
+                    timeField,
+                    endTimeField,
+                    reminderField,
+                    notesField,
+                  ]}
+                  renderMeta={(i) => (
+                    <>
+                      {i.local && <span>{i.local}</span>}
+                      {i.submissao && <Badge variant="outline" className="ml-1 border-indigo-200 text-indigo-700">Submissão: {formatDate(i.submissao)}</Badge>}
+                    </>
+                  )}
+                />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
           <TabsContent value="pessoal" className="mt-4">
-            <AreaTabs storageKey="agenda.tasks.pessoal" label="Pessoal">
+            <AreaTabs tasks={taskGroups[9].tasks} setTasks={taskGroups[9].setTasks} label="Pessoal" materias={materias}>
             <Section<Pessoal>
               title="Pessoal"
               description="Compromissos e tarefas da vida pessoal: saúde, lazer, consultas e afazeres."
@@ -1228,6 +1500,7 @@ export default function AgendaApp() {
                 { ...titleField, placeholder: "Ex.: Consulta dermatologista" },
                 dateField,
                 timeField,
+                endTimeField,
                 reminderField,
                 {
                   key: "categoria",
