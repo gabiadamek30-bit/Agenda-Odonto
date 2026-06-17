@@ -72,14 +72,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Agenda Odonto — Faculdade organizada" },
-      { name: "description", content: "Agenda para estudantes de Odontologia: clínica, matérias, estágio, provas, TBL, trabalhos, materiais e IC." },
+      { title: "Agenda Odonto" },
+      { name: "description", content: "Odonto Planner is a student agenda app for dentistry, organizing academic and personal schedules." },
       { name: "author", content: "Agenda Odonto" },
       { property: "og:title", content: "Agenda Odonto" },
-      { property: "og:description", content: "Organize clínica, matérias, provas, TBL, trabalhos, materiais e IC." },
+      { property: "og:description", content: "Odonto Planner is a student agenda app for dentistry, organizing academic and personal schedules." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Agenda Odonto" },
+      { name: "twitter:description", content: "Odonto Planner is a student agenda app for dentistry, organizing academic and personal schedules." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e4e8eb7c-507e-4696-82f8-b0ed7de6c072/id-preview-80d0bba1--2a164560-a805-4881-adf4-f73825564acd.lovable.app-1781737286074.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e4e8eb7c-507e-4696-82f8-b0ed7de6c072/id-preview-80d0bba1--2a164560-a805-4881-adf4-f73825564acd.lovable.app-1781737286074.png" },
     ],
     links: [
       {
