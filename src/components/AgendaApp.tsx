@@ -744,7 +744,7 @@ export default function AgendaApp() {
   const [icCongressos, setIcCongressos] = useLocalStorage<IcCongresso[]>("agenda.ic.congressos", []);
   const [icTitulo, setIcTitulo] = useLocalStorage<string>(
     "agenda.ic.titulo",
-    "Avaliação do Impacto do Flash versus Luz de Refletor na Captura de Imagens para Treinamento de Redes Neurais na Detecção e Classificação de Lesões Brancas da Cavidade Oral",
+    "Iniciação Científica",
   );
   const [icEditingTitle, setIcEditingTitle] = useState(false);
   const [icTituloDraft, setIcTituloDraft] = useState(icTitulo);
