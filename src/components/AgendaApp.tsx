@@ -617,12 +617,12 @@ function TasksPanel({
             className="sm:w-44"
           />
           {materias && materias.length > 0 && (
-            <Select value={draftMateriaId} onValueChange={setDraftMateriaId}>
+            <Select value={draftMateriaId || "__none__"} onValueChange={(v) => setDraftMateriaId(v === "__none__" ? "" : v)}>
               <SelectTrigger className="sm:w-40">
                 <SelectValue placeholder="Matéria (opt.)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Sem matéria</SelectItem>
+                <SelectItem value="__none__">Sem matéria</SelectItem>
                 {materias.map((m) => (
                   <SelectItem key={m.id} value={m.id}>{m.title}</SelectItem>
                 ))}
