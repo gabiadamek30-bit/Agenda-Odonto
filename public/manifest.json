@@ -1,0 +1,16 @@
+{
+  "name": "Agenda Odonto",
+  "short_name": "Agenda 🦷",
+  "description": "Planner da faculdade de odonto",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fff1f2",
+  "theme_color": "#e11d48",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}
